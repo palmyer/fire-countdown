@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FIRE 倒计时 · 人生可视化</title>
+<link rel="stylesheet" href="shared/theme.css">
+<link rel="stylesheet" href="shared/wheel.css">
+<style>
+  .milestones { padding: 6px 18px 18px; }
+  .ms { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 0.5px solid var(--sep); font-size: 13px; }
+  .ms:first-child { border-top: none; }
+  .ms .m-name { flex: 1; color: var(--text); }
+  .ms .m-name span { color: var(--sub); font-size: 12px; display: block; margin-top: 2px; }
+  .ms .m-val { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .ms.done .m-val { color: var(--green); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="tool-head">
+    <a class="back" href="preview.html" target="_top">📱 手机预览版</a>
+    <h1>FIRE 倒计时</h1>
+    <p class="sub">4% 法则：年支出 × 25 = 财务自由目标——算算还有几年</p>
+  </header>
+
+  <section class="card">
+    <div class="card-title">现状</div>
+    <div class="field-row"><span class="label">当前存款（元）</span><input type="number" id="savings" min="0" value="200000"></div>
+    <div class="separator"></div>
+    <div class="field-row"><span class="label">年支出（元）</span><input type="number" id="spend" min="1" value="120000"></div>
+    <div class="separator"></div>
+    <div class="field-row"><span class="label">每年能存（元）</span><input type="number" id="saveYear" min="0" value="60000"></div>
+    <div class="separator"></div>
+    <div class="field-row"><span class="label">年化收益</span><input type="number" id="rate" min="0" max="20" step="0.5" value="5"><span class="label" style="min-width:auto">%</span></div>
+  </section>
+
+  <section class="card" id="resultCard"></section>
+  <section class="card" id="msCard"></section>
+
+  <p class="hint" style="text-align:center">自由不是不工作，是可以只做喜欢的事。</p>
+</div>
+
+<script src="shared/core.js"></script>
+<script src="shared/wheel.js"></script>
+<script>
+function render() {
+  var savings = parseFloat(document.getElementById('savings').value) || 0;
+  var spend = parseFloat(document.getElementById('spend').value) || 1;
+  var saveYear = parseFloat(document.getElementById('saveYear').value) || 0;
+  var r = (parseFloat(document.getElementById('rate').value) || 0) / 100;
+
+  var target = spend * 25;
+  var pct = Math.min(100, savings / target * 100);
+
+  var s = LGF.computeLife(LGF.getBirthday(), LGF.getLifespan());
+
+  // 逐年模拟：存款复利 + 每年储蓄，直到达到目标
+  var cur = savings, years = 0, hit = false;
+  for (var y = 0; y < 100; y++) {
+    if (cur >= target) { hit = true; years = y; break; }
+    cur = cur * (1 + r) + saveYear;
+  }
+  var hitYear = new Date().getFullYear() + years;
+  var hitAge = s.age + years;
+
+  // Coast FIRE：现在躺平不存钱，仅靠复利到 60 岁也能达标
+  var coastNeed = target / Math.pow(1 + r, 60 - s.age);
+  var coastOK = savings >= coastNeed;
+
+  document.getElementById('resultCard').innerHTML =
+    '<div class="stat-cap">财务自由进度</div>' +
+    '<div class="stat-big">' + pct.toFixed(1) + '<span class="stat-unit">%</span></div>' +
+    '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+    '<div class="stat-cells">' +
+      '<div class="stat-cell"><div class="num">¥' + LGF.fmt(Math.round(target)) + '</div><div class="cap">目标（年支出×25）</div></div>' +
+      '<div class="stat-cell"><div class="num">' + (hit ? years + ' 年' : '未达成') + '</div><div class="cap">按当前储蓄速度</div></div>' +
+      '<div class="stat-cell"><div class="num">' + (hit ? hitAge + ' 岁' : '—') + '</div><div class="cap">预计达成（' + (hit ? hitYear : '加把劲') + '）</div></div>' +
+    '</div>' +
+    '<div class="stat-foot">' + (saveYear === 0 && !hit ? '每年储蓄为 0，只靠复利很难到达——调一调上面的数字' : '每多存 ' + LGF.fmt(Math.round(spend)) + ' 元/年，提前约 1 年') + '</div>';
+
+  function ms(done, name, note, val) {
+    return '<div class="ms' + (done ? ' done' : '') + '"><div class="m-name">' + name + '<span>' + note + '</span></div><div class="m-val">' + val + '</div></div>';
+  }
+  document.getElementById('msCard').innerHTML =
+    '<div class="card-title">里程碑</div><div class="milestones">' +
+    ms(pct >= 25, '四分之一', '存款达到目标的 25%', (pct >= 25 ? '✓ 已达成' : '¥' + LGF.fmt(Math.round(target * 0.25)))) +
+    ms(pct >= 50, '半程', '存款达到目标的 50%', (pct >= 50 ? '✓ 已达成' : '¥' + LGF.fmt(Math.round(target * 0.5)))) +
+    ms(coastOK, 'Coast FIRE', '现在躺平不存钱，复利到 60 岁也能达标', (coastOK ? '✓ 已达成' : '需 ¥' + LGF.fmt(Math.round(coastNeed)))) +
+    ms(hit, '财务自由', '被动收入覆盖支出，工作变成选择题', (hit ? '✓ ' + hitYear + ' 年' : '冲刺中')) +
+    '</div>';
+}
+
+['savings', 'spend', 'saveYear', 'rate'].forEach(function (id) {
+  document.getElementById(id).addEventListener('input', render);
+});
+render();
+</script>
+</body>
+</html>
